@@ -1,4 +1,4 @@
-pub trait Color {
+pub trait Color: Copy + Clone {
     fn bits_per_pixel() -> usize;
     fn fill(&self, buffer: &mut [u8], left: i32, right: i32);
 }

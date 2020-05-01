@@ -1,4 +1,6 @@
 pub mod color;
+pub mod font;
+pub mod image;
 
 use core::cmp::max;
 use core::cmp::min;
@@ -37,8 +39,16 @@ where
         color.fill(self.buffer, left, right);
     }
 
-    pub fn render_bitmap(&mut self, clip: &ClipRow, left: i32, right: i32, bits: &[u8]) {
+    pub fn render_bitmap(
+        &mut self,
+        clip: &ClipRow,
+        left: i32,
+        right: i32,
+        bits: &[u8],
+        color: ColorType,
+    ) {
         // TODO: self.mirror_x
+        // TODO: Color!
         let line_clip = clip.clip(left, right);
         if line_clip.is_empty() {
             return;
@@ -129,20 +139,21 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{Color, RowRenderer};
+    use super::color::BlackWhite::{self, Black, White};
+    use super::RowRenderer;
 
     #[test]
     #[should_panic]
     fn test_row_renderer_new_panic() {
         let mut buffer = [0u8];
-        RowRenderer::new(&mut buffer, 12);
+        RowRenderer::<BlackWhite>::new(&mut buffer, 12, false);
     }
 
     struct FillTest {
         before: [u8; 4],
         clip: (i32, i32),
         fill: (i32, i32),
-        color: Color,
+        color: BlackWhite,
         ok: [u8; 4],
     }
 
@@ -153,80 +164,79 @@ mod tests {
                 before: [0; 4],
                 clip: (0, 32),
                 fill: (4, 16),
-                color: Color::White,
+                color: White,
                 ok: [0x0f, 0xff, 0x0, 0x0],
             },
             FillTest {
                 before: [0; 4],
                 clip: (0, 32),
                 fill: (4, 20),
-                color: Color::White,
+                color: White,
                 ok: [0x0f, 0xff, 0xf0, 0x0],
             },
             FillTest {
                 before: [0; 4],
                 clip: (0, 32),
                 fill: (2, 6),
-                color: Color::White,
+                color: White,
                 ok: [0x3c, 0x0, 0x0, 0x0],
             },
             FillTest {
                 before: [0; 4],
                 clip: (0, 32),
                 fill: (2, 6),
-                color: Color::Black,
+                color: Black,
                 ok: [0x0, 0x0, 0x0, 0x0],
             },
             FillTest {
                 before: [0xff; 4],
                 clip: (0, 32),
                 fill: (2, 6),
-                color: Color::Black,
+                color: Black,
                 ok: [0xc3, 0xff, 0xff, 0xff],
             },
             FillTest {
                 before: [0; 4],
                 clip: (0, 32),
                 fill: (5, 5),
-                color: Color::White,
+                color: White,
                 ok: [0; 4],
             },
             FillTest {
                 before: [0; 4],
                 clip: (0, 32),
                 fill: (-5, -4),
-                color: Color::White,
+                color: White,
                 ok: [0; 4],
             },
             FillTest {
                 before: [0; 4],
                 clip: (9, 32),
                 fill: (4, 12),
-                color: Color::White,
+                color: White,
                 ok: [0, 0x70, 0, 0],
             },
             FillTest {
                 before: [0; 4],
                 clip: (6, 5),
                 fill: (4, 12),
-                color: Color::White,
+                color: White,
                 ok: [0, 0, 0, 0],
             },
             FillTest {
                 before: [0; 4],
                 clip: (0, 32),
                 fill: (16, 32),
-                color: Color::White,
+                color: White,
                 ok: [0, 0, 0xff, 0xff],
             },
         ];
         for test in &tests {
             let mut buffer = test.before;
-            let mut renderer = RowRenderer::new(&mut buffer[..], 32);
+            let mut renderer = RowRenderer::new(&mut buffer[..], 32, false);
             let clip = renderer.full_row();
             let clip = clip.clip(test.clip.0, test.clip.1);
             renderer.fill(&clip, test.fill.0, test.fill.1, test.color);
-            renderer.finish();
             println!("{:?} == {:?}?", buffer, test.ok);
             assert!(buffer == test.ok);
         }
