@@ -137,6 +137,14 @@ where
         let renderer = RowRenderer::new(buffer, self.width, self.mirror_x);
         (self.draw)(y, renderer);
     }
+
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+
+    pub fn width(&self) -> u32 {
+        self.width
+    }
 }
 
 #[cfg(test)]
