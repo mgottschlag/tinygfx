@@ -1,3 +1,5 @@
+#![no_std]
+
 pub mod color;
 pub mod font;
 pub mod image;
@@ -237,8 +239,7 @@ mod tests {
             let clip = renderer.full_row();
             let clip = clip.clip(test.clip.0, test.clip.1);
             renderer.fill(&clip, test.fill.0, test.fill.1, test.color);
-            println!("{:?} == {:?}?", buffer, test.ok);
-            assert!(buffer == test.ok);
+            assert_eq!(buffer, test.ok);
         }
     }
 }
