@@ -1,5 +1,5 @@
 use super::color::Color;
-use super::{ClipRow, RowRenderer};
+use super::{Clip, Renderer};
 
 pub struct MonoBitmapImage {
     pub data: &'static [u8],
@@ -11,8 +11,8 @@ pub struct MonoBitmapImage {
 impl MonoBitmapImage {
     pub fn render_row_transparent<ColorType: Color>(
         &self,
-        row: &mut RowRenderer<ColorType>,
-        clip: &ClipRow,
+        row: &mut Renderer<ColorType>,
+        clip: Clip,
         y: i32,
         offset: i32,
         color: ColorType,
@@ -38,10 +38,11 @@ pub struct MonoRLEImage {
 }
 
 impl MonoRLEImage {
+    // TODO: Naming in the whole library: row vs renderer
     pub fn render_row_transparent<ColorType: Color>(
         &self,
-        row: &mut RowRenderer<ColorType>,
-        clip: &ClipRow,
+        row: &mut Renderer<ColorType>,
+        clip: Clip,
         y: i32,
         offset: i32,
         color: ColorType,

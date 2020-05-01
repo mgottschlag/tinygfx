@@ -10,40 +10,32 @@ use core::marker::PhantomData;
 
 use color::Color;
 
-pub struct RowRenderer<'a, ColorType> {
+pub struct Renderer<'a, ColorType> {
     buffer: &'a mut [u8],
     width: u32,
+    height: u32,
+    row: u32,
     mirror_x: bool,
     phantom: PhantomData<ColorType>,
 }
 
-impl<'a, ColorType> RowRenderer<'a, ColorType>
+impl<'a, ColorType> Renderer<'a, ColorType>
 where
     ColorType: Color,
 {
-    fn new(buffer: &'a mut [u8], width: u32, mirror_x: bool) -> Self {
-        assert!(buffer.len() * 8 >= width as usize * ColorType::bits_per_pixel());
-        RowRenderer {
-            buffer,
-            width,
-            mirror_x,
-            phantom: PhantomData,
-        }
-    }
-
-    pub fn fill(&mut self, clip: &ClipRow, left: i32, right: i32, color: ColorType) {
+    pub fn fill(&mut self, clip: Clip, left: i32, right: i32, color: ColorType) {
+        // TODO: y clipping!
         // TODO: self.mirror_x
-        let line_clip = clip.clip(left, right);
+        let line_clip = clip.clip_left(left).clip_right(right);
         if line_clip.is_empty() {
             return;
         }
-        let (left, right) = line_clip.get();
-        color.fill(self.buffer, left, right);
+        color.fill(self.buffer, line_clip.left(), line_clip.right());
     }
 
     pub fn render_bitmap(
         &mut self,
-        clip: &ClipRow,
+        clip: Clip,
         left: i32,
         right: i32,
         bits: &[u8],
@@ -51,12 +43,13 @@ where
     ) {
         // TODO: self.mirror_x
         // TODO: Color!
-        let line_clip = clip.clip(left, right);
+        // TODO: y clipping!
+        let line_clip = clip.clip_left(left).clip_right(right);
         if line_clip.is_empty() {
             return;
         }
 
-        for x in line_clip.get().0..line_clip.get().1 {
+        for x in line_clip.left()..line_clip.right() {
             let byte = (x - left) / 8;
             let bit = (x - left) & 7;
             if (bits[byte as usize] & (1 << bit)) != 0 {
@@ -67,28 +60,101 @@ where
         }
     }
 
-    pub fn full_row(&self) -> ClipRow {
-        ClipRow {
+    pub fn clear(&mut self, color: ColorType) {
+        self.fill(self.full_frame(), 0, self.width as i32, color);
+    }
+
+    pub fn full_frame(&self) -> Clip {
+        Clip {
             left: 0,
             right: self.width as i32,
+            top: 0,
+            bottom: self.height as i32,
         }
     }
+
+    pub fn current_row(&self) -> u32 {
+        self.row
+    }
 }
 
-pub struct ClipRow {
+#[derive(Copy, Clone)]
+pub struct Clip {
     left: i32,
+    top: i32,
     right: i32,
+    bottom: i32,
 }
 
-impl ClipRow {
-    pub fn get(&self) -> (i32, i32) {
-        (self.left, self.right)
+impl Clip {
+    pub fn left(&self) -> i32 {
+        self.left
     }
 
-    pub fn clip(&self, left: i32, right: i32) -> ClipRow {
-        ClipRow {
+    pub fn right(&self) -> i32 {
+        self.right
+    }
+
+    pub fn top(&self) -> i32 {
+        self.top
+    }
+
+    pub fn bottom(&self) -> i32 {
+        self.bottom
+    }
+
+    pub fn clip_left(self, left: i32) -> Clip {
+        Clip {
             left: max(self.left, left),
+            top: self.top,
+            right: self.right,
+            bottom: self.bottom,
+        }
+    }
+
+    pub fn clip_right(self, right: i32) -> Clip {
+        Clip {
+            left: self.left,
+            top: self.top,
             right: min(self.right, right),
+            bottom: self.bottom,
+        }
+    }
+
+    pub fn clip_top(self, top: i32) -> Clip {
+        Clip {
+            left: self.left,
+            top: max(self.top, top),
+            right: self.right,
+            bottom: self.bottom,
+        }
+    }
+
+    pub fn clip_bottom(self, bottom: i32) -> Clip {
+        Clip {
+            left: self.left,
+            top: self.top,
+            right: self.right,
+            bottom: min(self.bottom, bottom),
+        }
+    }
+
+    pub fn clip(self, left: i32, top: i32, right: i32, bottom: i32) -> Clip {
+        Clip {
+            left: max(self.left, left),
+            top: max(self.top, top),
+            right: min(self.right, right),
+            bottom: min(self.bottom, bottom),
+        }
+    }
+
+    pub fn contains_row(self, row: u32) -> bool {
+        if (row as i32) < self.top {
+            false
+        } else if row as i32 >= self.bottom {
+            false
+        } else {
+            true
         }
     }
 
@@ -108,7 +174,7 @@ pub struct Frame<Draw, ColorType> {
 
 impl<Draw, ColorType> Frame<Draw, ColorType>
 where
-    Draw: Fn(u32, RowRenderer<ColorType>),
+    Draw: Fn(Renderer<ColorType>),
     ColorType: Color,
 {
     pub fn new(width: u32, height: u32, draw: Draw) -> Self {
@@ -134,8 +200,15 @@ where
         if self.mirror_y {
             y = self.height - y - 1;
         }
-        let renderer = RowRenderer::new(buffer, self.width, self.mirror_x);
-        (self.draw)(y, renderer);
+        assert!(buffer.len() * 8 >= self.width as usize * ColorType::bits_per_pixel());
+        (self.draw)(Renderer {
+            buffer,
+            width: self.width,
+            height: self.height,
+            row: y,
+            mirror_x: self.mirror_x,
+            phantom: PhantomData,
+        });
     }
 
     pub fn height(&self) -> u32 {
@@ -147,16 +220,50 @@ where
     }
 }
 
+pub struct Rectangle<ColorType> {
+    left: i32,
+    top: i32,
+    width: i32,
+    height: i32,
+    color: ColorType,
+}
+
+impl<ColorType> Rectangle<ColorType>
+where
+    ColorType: Color,
+{
+    pub fn new(left: i32, top: i32, width: i32, height: i32, color: ColorType) -> Self {
+        Self {
+            left,
+            top,
+            width,
+            height,
+            color,
+        }
+    }
+
+    pub fn draw(&self, clip: Clip, renderer: &mut Renderer<ColorType>) {
+        if !clip
+            .clip_top(self.top)
+            .clip_bottom(self.top + self.height)
+            .contains_row(renderer.current_row())
+        {
+            return;
+        }
+        renderer.fill(clip, self.left, self.left + self.width, self.color);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::color::BlackWhite::{self, Black, White};
-    use super::RowRenderer;
+    use super::{Frame, Renderer};
 
     #[test]
     #[should_panic]
     fn test_row_renderer_new_panic() {
         let mut buffer = [0u8];
-        RowRenderer::<BlackWhite>::new(&mut buffer, 12, false);
+        Frame::new(12, 1, |renderer: Renderer<BlackWhite>| {}).draw_row(0, &mut buffer);
     }
 
     struct FillTest {
@@ -241,12 +348,15 @@ mod tests {
                 ok: [0, 0, 0xff, 0xff],
             },
         ];
+        // TODO: Tests for y clipping.
         for test in &tests {
             let mut buffer = test.before;
-            let mut renderer = RowRenderer::new(&mut buffer[..], 32, false);
-            let clip = renderer.full_row();
-            let clip = clip.clip(test.clip.0, test.clip.1);
-            renderer.fill(&clip, test.fill.0, test.fill.1, test.color);
+            Frame::new(32, 1, |mut renderer| {
+                let clip = renderer.full_frame();
+                let clip = clip.clip_left(test.clip.0).clip_right(test.clip.1);
+                renderer.fill(clip, test.fill.0, test.fill.1, test.color);
+            })
+            .draw_row(0, &mut buffer);
             assert_eq!(buffer, test.ok);
         }
     }

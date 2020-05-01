@@ -1,6 +1,6 @@
 use super::color::Color;
 use super::image::MonoRLEImage;
-use super::{ClipRow, RowRenderer};
+use super::{Clip, Renderer};
 
 pub struct Font {
     pub ascender: u16,
@@ -25,8 +25,8 @@ impl Font {
 
     pub fn render_row<ColorType: Color>(
         &self,
-        row: &mut RowRenderer<ColorType>,
-        clip: &ClipRow,
+        row: &mut Renderer<ColorType>,
+        clip: Clip,
         text: &str,
         y: i32,
         offset: i32,
@@ -52,8 +52,8 @@ impl Font {
 
     fn render_glyph_row<ColorType: Color>(
         &self,
-        row: &mut RowRenderer<ColorType>,
-        clip: &ClipRow,
+        row: &mut Renderer<ColorType>,
+        clip: Clip,
         glyph: &Glyph,
         y: i32,
         offset: i32,
