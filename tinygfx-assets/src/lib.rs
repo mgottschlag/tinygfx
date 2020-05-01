@@ -172,7 +172,7 @@ impl Font {
         }
         data_text += "\n                    ]";
         format!(
-            "{}::image::RLEImage {{
+            "{}::image::MonoRLEImage {{
                     data: &{},
                     width: {},
                     height: {},
@@ -249,7 +249,7 @@ impl Image {
         }
         data_str += "    ]";
         format!(
-            "pub const {}: {}::image::BitmapImage = {}::image::BitmapImage {{
+            "pub const {}: {}::image::MonoBitmapImage = {}::image::MonoBitmapImage {{
     data: &{},
     width: {},
     height: {},
