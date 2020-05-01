@@ -1,0 +1,6 @@
+*.swp
+/tinygfx/target
+/tinygfx/Cargo.lock
+/tinygfx-assets/target
+/target
+/Cargo.lock
