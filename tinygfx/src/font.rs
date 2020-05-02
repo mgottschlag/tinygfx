@@ -1,5 +1,5 @@
 use super::color::Color;
-use super::image::MonoRLEImage;
+use super::image::{MonoImageData, MonoRLEImage};
 use super::{Clip, Renderer};
 
 pub struct Font {

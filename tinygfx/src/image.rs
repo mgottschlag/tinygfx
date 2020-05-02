@@ -1,6 +1,20 @@
 use super::color::Color;
 use super::{Clip, Renderer};
 
+pub trait MonoImageData {
+    fn render_row_transparent<ColorType: Color>(
+        &self,
+        row: &mut Renderer<ColorType>,
+        clip: Clip,
+        y: i32,
+        offset: i32,
+        color: ColorType,
+    );
+
+    fn width(&self) -> u32;
+    fn height(&self) -> u32;
+}
+
 pub struct MonoBitmapImage {
     pub data: &'static [u8],
     pub width: u16,
@@ -8,8 +22,8 @@ pub struct MonoBitmapImage {
     pub stride: u16,
 }
 
-impl MonoBitmapImage {
-    pub fn render_row_transparent<ColorType: Color>(
+impl MonoImageData for MonoBitmapImage {
+    fn render_row_transparent<ColorType: Color>(
         &self,
         row: &mut Renderer<ColorType>,
         clip: Clip,
@@ -29,6 +43,13 @@ impl MonoBitmapImage {
             color,
         );
     }
+
+    fn width(&self) -> u32 {
+        self.width as u32
+    }
+    fn height(&self) -> u32 {
+        self.height as u32
+    }
 }
 
 pub struct MonoRLEImage {
@@ -37,9 +58,9 @@ pub struct MonoRLEImage {
     pub height: u16,
 }
 
-impl MonoRLEImage {
+impl MonoImageData for MonoRLEImage {
     // TODO: Naming in the whole library: row vs renderer
-    pub fn render_row_transparent<ColorType: Color>(
+    fn render_row_transparent<ColorType: Color>(
         &self,
         row: &mut Renderer<ColorType>,
         clip: Clip,
@@ -65,5 +86,12 @@ impl MonoRLEImage {
             }
             pos += length as i32;
         }
+    }
+
+    fn width(&self) -> u32 {
+        self.width as u32
+    }
+    fn height(&self) -> u32 {
+        self.height as u32
     }
 }

@@ -10,6 +10,7 @@ use core::marker::PhantomData;
 
 use color::Color;
 use font::Font;
+use image::MonoImageData;
 
 pub struct Renderer<'a, ColorType> {
     buffer: &'a mut [u8],
@@ -258,6 +259,7 @@ pub struct Text<'a, ColorType> {
     text: &'a str,
     x: i32,
     y: i32,
+    x_align: i32,
     font: &'a Font,
     color: ColorType,
 }
@@ -271,9 +273,18 @@ where
             text,
             x,
             y,
+            x_align: 0,
             font,
             color,
         }
+    }
+
+    pub fn align(&mut self, align: TextAlignment) {
+        self.x_align = match align {
+            TextAlignment::Left => 0,
+            TextAlignment::Right => -(self.font.get_text_size(self.text).0 as i32),
+            TextAlignment::Center => -(self.font.get_text_size(self.text).0 as i32) / 2,
+        };
     }
 
     pub fn draw(&self, clip: Clip, renderer: &mut Renderer<ColorType>) {
@@ -282,10 +293,44 @@ where
             clip,
             self.text,
             renderer.current_row() as i32 - self.y,
+            self.x + self.x_align,
+            self.color,
+        );
+    }
+}
+
+pub struct MonoImage<'a, ImageType, ColorType> {
+    image: &'a ImageType,
+    x: i32,
+    y: i32,
+    color: ColorType,
+}
+
+impl<'a, ImageType, ColorType> MonoImage<'a, ImageType, ColorType>
+where
+    ImageType: MonoImageData,
+    ColorType: Color,
+{
+    pub fn new(x: i32, y: i32, image: &'a ImageType, color: ColorType) -> Self {
+        Self { image, x, y, color }
+    }
+
+    pub fn draw(&self, clip: Clip, renderer: &mut Renderer<ColorType>) {
+        self.image.render_row_transparent(
+            renderer,
+            clip,
+            renderer.current_row() as i32 - self.y,
             self.x,
             self.color,
         );
     }
+}
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum TextAlignment {
+    Left,
+    Right,
+    Center,
 }
 
 #[cfg(test)]
