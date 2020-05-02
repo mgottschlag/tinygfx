@@ -9,6 +9,7 @@ use core::cmp::min;
 use core::marker::PhantomData;
 
 use color::Color;
+use font::Font;
 
 pub struct Renderer<'a, ColorType> {
     buffer: &'a mut [u8],
@@ -251,6 +252,40 @@ where
             return;
         }
         renderer.fill(clip, self.left, self.left + self.width, self.color);
+    }
+}
+
+pub struct Text<'a, ColorType> {
+    text: &'a str,
+    x: i32,
+    y: i32,
+    font: &'a Font,
+    color: ColorType,
+}
+
+impl<'a, ColorType> Text<'a, ColorType>
+where
+    ColorType: Color,
+{
+    pub fn new(x: i32, y: i32, text: &'a str, font: &'a Font, color: ColorType) -> Self {
+        Self {
+            text,
+            x,
+            y,
+            font,
+            color,
+        }
+    }
+
+    pub fn draw(&self, clip: Clip, renderer: &mut Renderer<ColorType>) {
+        self.font.render_row(
+            renderer,
+            clip,
+            self.text,
+            renderer.current_row() as i32 - self.y,
+            self.x,
+            self.color,
+        );
     }
 }
 
