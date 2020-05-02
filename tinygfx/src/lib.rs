@@ -16,7 +16,6 @@ pub struct Renderer<'a, ColorType> {
     width: u32,
     height: u32,
     row: u32,
-    mirror_x: bool,
     phantom: PhantomData<ColorType>,
 }
 
@@ -26,7 +25,6 @@ where
 {
     pub fn fill(&mut self, clip: Clip, left: i32, right: i32, color: ColorType) {
         // TODO: y clipping!
-        // TODO: self.mirror_x
         let line_clip = clip.clip_left(left).clip_right(right);
         if line_clip.is_empty() {
             return;
@@ -40,9 +38,8 @@ where
         left: i32,
         right: i32,
         bits: &[u8],
-        color: ColorType,
+        _color: ColorType,
     ) {
-        // TODO: self.mirror_x
         // TODO: Color!
         // TODO: y clipping!
         let line_clip = clip.clip_left(left).clip_right(right);
@@ -207,9 +204,11 @@ where
             width: self.width,
             height: self.height,
             row: y,
-            mirror_x: self.mirror_x,
             phantom: PhantomData,
         });
+        if self.mirror_x {
+            ColorType::mirror_x(buffer, self.width as usize);
+        }
     }
 
     pub fn height(&self) -> u32 {

@@ -1,6 +1,7 @@
 pub trait Color: Copy + Clone {
     fn bits_per_pixel() -> usize;
     fn fill(&self, buffer: &mut [u8], left: i32, right: i32);
+    fn mirror_x(buffer: &mut [u8], width: usize);
 }
 
 #[derive(Copy, Clone)]
@@ -47,6 +48,28 @@ impl Color for BlackWhite {
                     buffer[right_index] &= !right_mask;
                 }
             }
+        }
+    }
+
+    fn mirror_x(buffer: &mut [u8], width: usize) {
+        let bytes = (width + 7) >> 3;
+        for i in 0..bytes / 2 {
+            let temp = buffer[i].reverse_bits();
+            buffer[i] = buffer[bytes - i - 1].reverse_bits();
+            buffer[bytes - i - 1] = temp;
+        }
+        if (bytes & 1) != 0 {
+            let center = bytes / 2 + 1;
+            buffer[center] = buffer[center].reverse_bits();
+        }
+        // If the first byte is now incomplete, shift to the left.
+        let remainder = width & 0x7;
+        if remainder != 0 {
+            let shift = 8 - remainder;
+            for i in 0..(bytes - 1) {
+                buffer[i] = (buffer[i] << shift) | (buffer[i + 1] >> remainder);
+            }
+            buffer[bytes - 1] <<= shift;
         }
     }
 }
