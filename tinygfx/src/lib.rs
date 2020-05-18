@@ -255,8 +255,8 @@ where
     }
 }
 
-pub struct Text<'a, ColorType> {
-    text: &'a str,
+pub struct Text<'a, ColorType, StringType> {
+    text: StringType,
     x: i32,
     y: i32,
     x_align: i32,
@@ -264,11 +264,12 @@ pub struct Text<'a, ColorType> {
     color: ColorType,
 }
 
-impl<'a, ColorType> Text<'a, ColorType>
+impl<'a, ColorType, StringType> Text<'a, ColorType, StringType>
 where
     ColorType: Color,
+    StringType: AsRef<str>,
 {
-    pub fn new(x: i32, y: i32, text: &'a str, font: &'a Font, color: ColorType) -> Self {
+    pub fn new(x: i32, y: i32, text: StringType, font: &'a Font, color: ColorType) -> Self {
         Self {
             text,
             x,
@@ -282,8 +283,8 @@ where
     pub fn align(&mut self, align: TextAlignment) {
         self.x_align = match align {
             TextAlignment::Left => 0,
-            TextAlignment::Right => -(self.font.get_text_size(self.text).0 as i32),
-            TextAlignment::Center => -(self.font.get_text_size(self.text).0 as i32) / 2,
+            TextAlignment::Right => -(self.font.get_text_size(self.text.as_ref()).0 as i32),
+            TextAlignment::Center => -(self.font.get_text_size(self.text.as_ref()).0 as i32) / 2,
         };
     }
 
@@ -291,7 +292,7 @@ where
         self.font.render_row(
             renderer,
             clip,
-            self.text,
+            self.text.as_ref(),
             renderer.current_row() as i32 - self.y,
             self.x + self.x_align,
             self.color,
