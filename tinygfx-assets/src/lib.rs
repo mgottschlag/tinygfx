@@ -26,7 +26,14 @@ impl Font {
         Ok(Font { face: face })
     }
 
-    pub fn generate(&mut self, name: &str, size: isize, subset: &str, gfx_crate: &str) -> String {
+    pub fn generate(
+        &mut self,
+        name: &str,
+        size: isize,
+        subset: &str,
+        type_: FontType,
+        gfx_crate: &str,
+    ) -> String {
         let mut subset = subset.chars().collect::<Vec<_>>();
         subset.sort();
         // Set the resultion to 72dpi so that a point equals a pixel.
@@ -34,12 +41,12 @@ impl Font {
         // Generate all glyphs.
         let mut glyphs = Vec::new();
         for c in subset.iter() {
-            glyphs.push(self.generate_glyph(*c, gfx_crate));
+            glyphs.push(self.generate_glyph(*c, type_, gfx_crate));
         }
         // Generate the font.
         let size = self.face.size_metrics().unwrap();
         format!(
-            "pub const {}: {}::font::Font = {}::font::Font {{
+            "pub const {}: {}::font::Font<{}> = {}::font::Font {{
     ascender: {},
     descender: {},
     glyphs: &[
@@ -50,6 +57,7 @@ impl Font {
 ",
             name,
             gfx_crate,
+            type_.get_image_type(gfx_crate),
             gfx_crate,
             (size.ascender + 63) / 64,
             -(size.descender + 63) / 64,
@@ -118,7 +126,7 @@ impl Font {
         }
     }
 
-    fn generate_glyph(&mut self, c: char, gfx_crate: &str) -> String {
+    fn generate_glyph(&mut self, c: char, type_: FontType, gfx_crate: &str) -> String {
         self.face
             .load_char(
                 c as usize,
@@ -126,17 +134,21 @@ impl Font {
             )
             .unwrap();
         let glyph = self.face.glyph();
-        let image = Self::generate_rle_image(&glyph.bitmap(), gfx_crate);
+        let image = match type_ {
+            FontType::RLE => Self::generate_rle_image(&glyph.bitmap(), gfx_crate),
+            FontType::Bitmap => Self::generate_bitmap_image(&glyph.bitmap(), gfx_crate),
+        };
         //assert!(glyph.bitmap_left() >= 0);
         assert!(glyph.bitmap_top() >= 0);
         format!(
-            "{}::font::Glyph {{
+            "{}::font::Glyph::<{}> {{
                 image: {},
                 image_left: {},
                 image_top: {},
                 advance: {},
         }}",
             gfx_crate,
+            type_.get_image_type(gfx_crate),
             image,
             glyph.bitmap_left(),
             glyph.bitmap_top(),
@@ -202,6 +214,49 @@ impl Font {
             }
         }
         output.push(((run_color as u16) << 15) | run_length);
+    }
+
+    fn generate_bitmap_image(bm: &freetype::Bitmap, gfx_crate: &str) -> String {
+        let buffer = bm.buffer();
+        let pitch = bm.pitch() as usize;
+        let width = bm.width() as usize;
+        let height = bm.rows() as usize;
+
+        let output_stride = (width + 7) >> 3;
+        let mut output_buffer = vec![0u8; output_stride * height];
+
+        for y in 0..height {
+            // Here, "output_stride" is at least as large as "pitch".
+            let input_row = &buffer[y * pitch..y * pitch + output_stride];
+            let output_row =
+                &mut output_buffer[y * output_stride..y * output_stride + output_stride];
+            output_row.copy_from_slice(input_row);
+        }
+
+        format!(
+            "{}::image::MonoBitmapImage {{
+                    data: &{:?},
+                    width: {},
+                    height: {},
+                    stride: {},
+                }}",
+            gfx_crate, output_buffer, width, height, output_stride
+        )
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum FontType {
+    RLE,
+    Bitmap,
+}
+
+impl FontType {
+    fn get_image_type(&self, gfx_crate: &str) -> String {
+        match self {
+            FontType::RLE => format!("{}::image::MonoRLEImage", gfx_crate),
+            FontType::Bitmap => format!("{}::image::MonoBitmapImage", gfx_crate),
+        }
     }
 }
 

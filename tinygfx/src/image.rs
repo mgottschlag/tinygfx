@@ -2,12 +2,12 @@ use super::color::Color;
 use super::{Clip, Renderer};
 
 pub trait MonoImageData {
-    fn render_row_transparent<ColorType: Color>(
+    fn render_transparent<ColorType: Color>(
         &self,
         row: &mut Renderer<ColorType>,
         clip: Clip,
+        x: i32,
         y: i32,
-        offset: i32,
         color: ColorType,
     );
 
@@ -23,25 +23,32 @@ pub struct MonoBitmapImage {
 }
 
 impl MonoImageData for MonoBitmapImage {
-    fn render_row_transparent<ColorType: Color>(
+    fn render_transparent<ColorType: Color>(
         &self,
-        row: &mut Renderer<ColorType>,
+        renderer: &mut Renderer<ColorType>,
         clip: Clip,
+        x: i32,
         y: i32,
-        offset: i32,
         color: ColorType,
     ) {
-        if y < 0 || y >= self.height as i32 {
-            return;
+        for row in 0..self.height as i32 {
+            if row + y < clip.top() {
+                continue;
+            }
+            if row + y >= clip.bottom() {
+                break;
+            }
+            let row_index = (row as i32 * self.stride as i32) as usize;
+            // TODO: Not transparent.
+            renderer.render_bitmap_row(
+                clip,
+                y + row,
+                x,
+                x + self.width as i32,
+                &self.data[row_index..row_index + self.stride as usize],
+                color,
+            );
         }
-        let row_index = (y * self.stride as i32) as usize;
-        row.render_bitmap(
-            clip,
-            offset,
-            offset + self.width as i32,
-            &self.data[row_index..row_index + self.stride as usize],
-            color,
-        );
     }
 
     fn width(&self) -> u32 {
@@ -60,31 +67,26 @@ pub struct MonoRLEImage {
 
 impl MonoImageData for MonoRLEImage {
     // TODO: Naming in the whole library: row vs renderer
-    fn render_row_transparent<ColorType: Color>(
+    fn render_transparent<ColorType: Color>(
         &self,
-        row: &mut Renderer<ColorType>,
+        renderer: &mut Renderer<ColorType>,
         clip: Clip,
+        x: i32,
         y: i32,
-        offset: i32,
         color: ColorType,
     ) {
-        if y < 0 {
-            return;
-        }
-        if y >= self.height as i32 {
-            return;
-        }
-        let line_start = self.data[y as usize] as usize;
-        let line_end = self.data[y as usize + 1] as usize;
-        let line = &self.data[line_start..line_end];
-
-        let mut pos = 0;
-        for run in line {
-            let length = (run & 0x7fff) as u32;
-            if (run >> 15) != 0u16 {
-                row.fill(clip, offset + pos, offset + pos + length as i32, color);
+        for row in 0..self.height as i32 {
+            if row + y < clip.top() {
+                continue;
             }
-            pos += length as i32;
+            if row + y >= clip.bottom() {
+                break;
+            }
+            let line_start = self.data[row as usize] as usize;
+            let line_end = self.data[row as usize + 1] as usize;
+            let line = &self.data[line_start..line_end];
+
+            renderer.render_rle_row(clip, x, row + y, line, color);
         }
     }
 
